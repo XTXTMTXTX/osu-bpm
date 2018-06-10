@@ -1,0 +1,530 @@
+#include<tchar.h>
+#include<windows.h>
+#include<gl/gl.h>
+#include<cstdio>
+#include<cstdlib>
+#include<cmath>
+#include<vector>
+#include<algorithm>
+#include"SOIL.h"
+#include<TlHelp32.h>
+#define ll long long
+#define max(x,y) ((x)>(y)?(x):(y))
+#define min(x,y) ((x)<(y)?(x):(y))
+#define abs(x) ((x)<0?-(x):(x))
+using namespace std;
+HANDLE hProcess;
+DWORD PID=0;
+bool quitflag=0,loading=1,delayF=1;
+double BPMMax=0,BPMMin=0,BPM=0,beats=0;;
+FILE *fp=0;
+unsigned char aob[]= {0xA3,0x00,0x00,0x00,0x00,0x8B,0x35,0x00,0x00,0x00,0x00,0x85,0xF6},mask[]= {1,0,0,0,0,1,1,0,0,0,0,1,1};
+struct info{
+	ll x;
+	double y;
+}tmplist;
+vector<info> list;
+DWORD getPID(LPCSTR ProcessName) {
+	HANDLE hProcessSnap;
+	PROCESSENTRY32 pe32;
+	// Take a snapshot of all processes in the system.
+	hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
+	if (hProcessSnap == INVALID_HANDLE_VALUE)return 0;
+	pe32.dwSize = sizeof(PROCESSENTRY32);
+	if (!Process32First(hProcessSnap,&pe32)) {
+		CloseHandle(hProcessSnap);          // clean the snapshot object
+		return 0;
+	}
+	DWORD dwPid=0;
+	do {
+		if(!strcmp(ProcessName, pe32.szExeFile)) {
+			dwPid=pe32.th32ProcessID;
+			break;
+		}
+	} while(Process32Next(hProcessSnap,&pe32));
+	CloseHandle(hProcessSnap);
+	return dwPid;
+}
+LPVOID AOB(LPVOID Startpoint) {
+	int len=sizeof(aob),pp=0;
+	unsigned int faddr=0;
+	unsigned char arBytes[2][4096],tmpByte[len*2+1];
+	for(unsigned int addr=(unsigned int)0x00400000; (unsigned int)addr<=(unsigned int)2*1024*1024*1024; addr=(unsigned int)addr+4*1024) {
+		ReadProcessMemory(hProcess,(LPVOID)addr,arBytes[0],4096,NULL);
+		ReadProcessMemory(hProcess,(LPVOID)(addr+4*1024),arBytes[1],4096,NULL);
+		for(int i=4096-len; i<4096; i++)tmpByte[i-4096+len]=arBytes[0][i];
+		for(int i=0; i<len-1; i++)tmpByte[len+i]=arBytes[1][i];
+		for(int i=(addr==0x00400000?0:len-1); i<4096; i++) {
+			if(arBytes[0][i]*mask[pp]==aob[pp]*mask[pp]) {
+				if(pp==len-1) {
+					faddr=addr+i;
+					if(DWORD(Startpoint)>faddr-len+1){
+						i=i-pp;
+						pp=0;
+					}else
+					return LPVOID(faddr-len+1);
+				} else pp++;
+			} else {
+				i=i-pp;
+				pp=0;
+			}
+		}
+		for(int i=0; i<len-1; i++) {
+			if(tmpByte[len+i]*mask[pp]==aob[pp]*mask[pp]) {
+				if(pp==len-1) {
+					faddr=addr+4096+i;
+					if(DWORD(Startpoint)>faddr-len+1){
+						i=i-pp;
+						pp=0;
+					}else
+					return LPVOID(faddr-len+1);
+				} else pp++;
+			} else {
+				i=i-pp;
+				pp=0;
+			}
+		}
+
+	}
+	return 0;
+}
+
+
+
+GLuint Num0tex,Num1tex,Num2tex,Num3tex,Num4tex,Num5tex,Num6tex,Num7tex,Num8tex,Num9tex,BGtex,MASKtex,Lightingtex;
+
+double CPUclock() {
+	LARGE_INTEGER nFreq;
+	LARGE_INTEGER t1;
+	double dt;
+	QueryPerformanceFrequency(&nFreq);
+	QueryPerformanceCounter(&t1);
+	dt=(t1.QuadPart)/(double)nFreq.QuadPart;
+	return(dt*1000);
+}
+int read(FILE *fp) {
+	int x=0,f=1;
+	char ch=fgetc(fp);
+	while(ch<'0'||ch>'9') {
+		if(ch=='-')f=-1;
+		ch=fgetc(fp);
+	}
+	while(ch>='0'&&ch<='9') {
+		x=x*10+ch-'0';
+		ch=fgetc(fp);
+	}
+	return x*f;
+}
+GLuint Drawnumber(const int &x) {
+	switch(abs(x)) {
+	case 0:
+		return Num0tex;
+		break;
+	case 1:
+		return Num1tex;
+		break;
+	case 2:
+		return Num2tex;
+		break;
+	case 3:
+		return Num3tex;
+		break;
+	case 4:
+		return Num4tex;
+		break;
+	case 5:
+		return Num5tex;
+		break;
+	case 6:
+		return Num6tex;
+		break;
+	case 7:
+		return Num7tex;
+		break;
+	case 8:
+		return Num8tex;
+		break;
+	case 9:
+		return Num9tex;
+		break;
+	}
+	return 0;
+}
+LRESULT CALLBACK WndProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
+void EnableOpenGL(HWND hWnd,HDC *hDC,HGLRC *hRC);
+void DisableOpenGL(HWND hWnd,HDC hDC,HGLRC hRC);
+void Work();
+int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,int iCmdShow) {
+	WNDCLASS wc;
+	HWND hWnd;
+	HDC hDC;
+	HGLRC hRC;
+	MSG msg;
+	BOOL bQuit=FALSE;
+	wc.style=CS_OWNDC;
+	wc.lpfnWndProc=WndProc;
+	wc.cbClsExtra=0;
+	wc.cbWndExtra=0;
+	wc.hInstance=hInstance;
+	wc.hIcon=LoadIcon(NULL,IDI_APPLICATION);
+	wc.hCursor=LoadCursor(NULL,IDC_ARROW);
+	wc.hbrBackground=(HBRUSH)GetStockObject(BLACK_BRUSH);
+	wc.lpszMenuName=NULL;
+	wc.lpszClassName=_T("osubpmreceiver");
+	RegisterClass(&wc);
+	hWnd=CreateWindow(_T("osubpmreceiver"),"osu!bpm",WS_CAPTION|WS_POPUPWINDOW|WS_VISIBLE,100,100,336,98,NULL,NULL,hInstance,NULL);
+	
+	HANDLE h1=CreateThread(0,0,(LPTHREAD_START_ROUTINE)Work,0,0,0);CloseHandle(h1);
+	EnableOpenGL(hWnd,&hDC,&hRC);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+
+	BGtex=SOIL_load_OGL_texture("SKIN/BG.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num0tex=SOIL_load_OGL_texture("SKIN/0.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num1tex=SOIL_load_OGL_texture("SKIN/1.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num2tex=SOIL_load_OGL_texture("SKIN/2.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num3tex=SOIL_load_OGL_texture("SKIN/3.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num4tex=SOIL_load_OGL_texture("SKIN/4.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num5tex=SOIL_load_OGL_texture("SKIN/5.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num6tex=SOIL_load_OGL_texture("SKIN/6.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num7tex=SOIL_load_OGL_texture("SKIN/7.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num8tex=SOIL_load_OGL_texture("SKIN/8.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Num9tex=SOIL_load_OGL_texture("SKIN/9.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	MASKtex=SOIL_load_OGL_texture("SKIN/mask.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	Lightingtex=SOIL_load_OGL_texture("SKIN/lighting.png",SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID,SOIL_FLAG_POWER_OF_TWO|SOIL_FLAG_DDS_LOAD_DIRECT);
+	glEnable(GL_TEXTURE_2D);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+	while (!bQuit&&!quitflag) {
+		if(PeekMessage(&msg,NULL,0,0,PM_REMOVE)) {
+			if(msg.message==WM_QUIT) {
+				bQuit=TRUE;
+			} else {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+		} else {
+			const float constFps=(float)(60);
+			DWORD timeInPerFrame=1000.0f/constFps;
+			DWORD timeBegin=GetTickCount();
+			/* OpenGL animation code goes here */
+			glClearColor(0.0f,0.0f,0.0f,0.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+
+
+			glPushMatrix();
+
+			glBindTexture(GL_TEXTURE_2D,BGtex);
+
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-1.0f,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-1.0f,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (1.0f,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (1.0f,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMin)+0.0001)/100)%10));
+			glTranslatef(-0.799,-0.313,0.0f); 
+			glScaled(1.0-0.561,1.0-0.561,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMin)+0.0001)/10)%10));
+			glTranslatef(-0.658,-0.313,0.0f); 
+			glScaled(1.0-0.561,1.0-0.561,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(BPMMin)+0.0001)%10));
+			glTranslatef(-0.519,-0.313,0.0f); 
+			glScaled(1.0-0.561,1.0-0.561,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMax)+0.0001)/100)%10));
+			glTranslatef(0.483,-0.313,0.0f); 
+			glScaled(1.0-0.561,1.0-0.561,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMax)+0.0001)/10)%10));
+			glTranslatef(0.620,-0.313,0.0f); 
+			glScaled(1.0-0.561,1.0-0.561,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(BPMMax)+0.0001)%10));
+			glTranslatef(0.762,-0.313,0.0f); 
+			glScaled(1.0-0.561,1.0-0.561,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPM)+0.0001)/100)%10));
+			glTranslatef(-0.257,0.153,0.0f); 
+			glScaled(1.0-0.2334,1.0-0.2334,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPM)+0.0001)/10)%10));
+			glTranslatef(-0.024,0.153,0.0f); 
+			glScaled(1.0-0.2334,1.0-0.2334,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			glPushMatrix();
+			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(BPM)+0.0001)%10));
+			glTranslatef(0.201,0.153,0.0f); 
+			glScaled(1.0-0.2334,1.0-0.2334,1.0f);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-45.0/330.0,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (45.0/330.0,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (45.0/330.0,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			
+			
+			glPushMatrix();
+			glColor4f(1, 1, 1, (1.0-beats)*0.5+0.5);
+    		glBlendFunc( GL_SRC_ALPHA, GL_ONE );
+			glBindTexture(GL_TEXTURE_2D,Lightingtex);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-1.0f,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-1.0f,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (1.0f,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (1.0f,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+			
+			
+			glPushMatrix();
+			glColor4f(1, 1, 1, 1.0);
+    		glBlendFunc( GL_SRC_ALPHA, GL_ONE );
+			glBindTexture(GL_TEXTURE_2D,MASKtex);
+			glBegin (GL_QUADS);
+			glTexCoord2f(0.0f,1.0f);
+			glVertex2f (-1.0f,-1.0f);
+			glTexCoord2f(0.0f,0.0f);
+			glVertex2f (-1.0f,1.0f);
+			glTexCoord2f(1.0f,0.0f);
+			glVertex2f (1.0f,1.0f);
+			glTexCoord2f(1.0f,1.0f);
+			glVertex2f (1.0f,-1.0f);
+			glEnd ();
+			glPopMatrix ();
+
+			SwapBuffers (hDC);
+
+			DWORD timePhase=GetTickCount()-timeBegin;
+			if(timePhase<timeInPerFrame)Sleep(DWORD(timeInPerFrame-timePhase));
+		}
+	}
+	DisableOpenGL(hWnd,hDC,hRC);
+	DestroyWindow(hWnd);
+	return msg.wParam;
+}
+void Work(){
+	while(!PID){
+		PID=getPID("osu!.exe");
+		Sleep(50);
+	}
+	Sleep(5000);
+	ShellExecute(0,"open","osu!beatmapfinder.exe",0,0,SW_SHOWNORMAL);
+	if(!(hProcess=OpenProcess(PROCESS_VM_READ,0,PID))){
+		printf("Opening Failed\n");
+		quitflag=1;return;
+	}
+	LPVOID timeaddraddr=0,timeaddr=0;
+	do{
+		timeaddraddr=LPVOID((unsigned int)(AOB(timeaddraddr))+1);
+		ReadProcessMemory(hProcess,timeaddraddr,&timeaddr,4,NULL);
+	}while(DWORD(timeaddr)<=0x00001000);
+	int time=0;
+	int pp=0;
+	while(PID==getPID("osu!.exe")&&(getPID("osu!beatmapfinder.exe")!=0)){
+		if(loading){delayF=1;BPMMax=0;BPMMin=0;BPM=0;beats=0;continue;}
+		if(delayF){Sleep(15);delayF=0;time=0;pp=0;}
+		ReadProcessMemory(hProcess,timeaddr,&time,4,NULL);
+		while((pp+1<list.size())&&(list[pp+1].x<=time))pp++;
+		while((pp-1>=0)&&(list[pp].x>time))pp--;
+		BPM=list[pp].y;
+		beats=time-list[pp].x;
+		
+		while(beats>=0)beats-=60000/min(2000,list[pp].y);
+		while(beats<0)beats+=60000/min(2000,list[pp].y);
+		beats/=60000/min(2000,list[pp].y);
+		beats=max(0,beats);
+		Sleep(1);
+	}
+	quitflag=1;
+	CloseHandle(hProcess);
+}
+LRESULT CALLBACK WndProc (HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) {
+	switch (message) {
+	case WM_CREATE:
+		return 0;
+	case WM_CLOSE:
+		PostQuitMessage (0);
+		return 0;
+	case WM_DESTROY:
+		return 0;
+	case WM_KEYDOWN:
+		return 0;
+	case WM_COPYDATA: {
+		COPYDATASTRUCT *pCopyData = (COPYDATASTRUCT*)lParam;
+		//printf("%s\n",pCopyData->lpData);
+		loading=1;delayF=1;
+		BPMMin=0;BPM=0;BPMMax=0;
+		Sleep(15);
+		if(!(fp=fopen((char*)pCopyData->lpData,"rt"))){
+			return 0;
+		}
+		list.clear();
+		while(!feof(fp)){
+			if((fgetc(fp)=='[')&&(fgetc(fp)=='T')&&(fgetc(fp)=='i')&&(fgetc(fp)=='m')&&(fgetc(fp)=='i')&&(fgetc(fp)=='n')&&(fgetc(fp)=='g')
+			&&(fgetc(fp)=='P')&&(fgetc(fp)=='o')&&(fgetc(fp)=='i')&&(fgetc(fp)=='n')&&(fgetc(fp)=='t')&&(fgetc(fp)=='s')&&(fgetc(fp)==']')){
+				char tmps[512];
+				long long timeP=0;double beatlen=1000,tbpm=0;
+				fgets(tmps,512,fp);
+				while(1){
+					fgets(tmps,512,fp);
+					if(!strchr(tmps,','))break;
+					sscanf(tmps,"%lld,%lf",&timeP,&beatlen);
+					if(beatlen<=0)continue;
+					tbpm=60000.0/beatlen;
+					if(tbpm>BPMMax||BPMMax==0)BPMMax=tbpm;
+					if(tbpm<BPMMin||BPMMin==0)BPMMin=tbpm;
+					tmplist.x=timeP;
+					tmplist.y=tbpm;
+					list.push_back(tmplist);
+				}
+				break;
+			}
+		}
+		fclose(fp);
+		loading=0;
+		//printf("%.0lf - %.0lf\n",BPMMin,BPMMax);
+		return 0;
+	}
+	default:
+		return DefWindowProc(hWnd,message,wParam,lParam);
+	}
+}
+
+void EnableOpenGL(HWND hWnd,HDC *hDC,HGLRC *hRC) {
+	PIXELFORMATDESCRIPTOR pfd;
+	int iFormat;
+	*hDC=GetDC(hWnd);
+	ZeroMemory(&pfd,sizeof(pfd));
+	pfd.nSize=sizeof(pfd);
+	pfd.nVersion=1;
+	pfd.dwFlags=PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL|PFD_DOUBLEBUFFER;
+	pfd.iPixelType=PFD_TYPE_RGBA;
+	pfd.cColorBits=24;
+	pfd.cDepthBits=16;
+	pfd.iLayerType=PFD_MAIN_PLANE;
+	iFormat=ChoosePixelFormat(*hDC,&pfd);
+	SetPixelFormat(*hDC,iFormat,&pfd);
+	*hRC=wglCreateContext(*hDC);
+	wglMakeCurrent(*hDC,*hRC);
+
+}
+void DisableOpenGL(HWND hWnd,HDC hDC,HGLRC hRC) {
+	wglMakeCurrent(NULL, NULL);
+	wglDeleteContext(hRC);
+	ReleaseDC(hWnd,hDC);
+}
