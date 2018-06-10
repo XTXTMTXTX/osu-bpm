@@ -448,7 +448,7 @@ void Work(){
 		while(beats<0)beats+=60000/min(2000,list[pp].y);
 		beats/=60000/min(2000,list[pp].y);
 		beats=max(0,beats);
-		Sleep(1);
+		Sleep(33);
 	}
 	quitflag=1;
 	CloseHandle(hProcess);
