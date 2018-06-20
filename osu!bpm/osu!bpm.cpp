@@ -16,7 +16,8 @@ using namespace std;
 HANDLE hProcess;
 DWORD PID=0;
 bool quitflag=0,loading=1,delayF=1;
-double BPMMax=0,BPMMin=0,BPM=0,beats=0;;
+double BPMMax=0,BPMMin=0,BPM=0,beats=0;
+volatile float speed = 1.00;
 FILE *fp=0;
 unsigned char aob[]= {0xA3,0x00,0x00,0x00,0x00,0x8B,0x35,0x00,0x00,0x00,0x00,0x85,0xF6},mask[]= {1,0,0,0,0,1,1,0,0,0,0,1,1};
 struct info{
@@ -24,6 +25,7 @@ struct info{
 	double y;
 }tmplist;
 vector<info> list;
+HMODULE DllInject(HANDLE hProcess,const char *dllname);
 DWORD getPID(LPCSTR ProcessName) {
 	HANDLE hProcessSnap;
 	PROCESSENTRY32 pe32;
@@ -166,14 +168,14 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 	wc.cbClsExtra=0;
 	wc.cbWndExtra=0;
 	wc.hInstance=hInstance;
-	wc.hIcon=LoadIcon(NULL,IDI_APPLICATION);
+	wc.hIcon=LoadIcon(hInstance,MAKEINTRESOURCE(3056));
 	wc.hCursor=LoadCursor(NULL,IDC_ARROW);
 	wc.hbrBackground=(HBRUSH)GetStockObject(BLACK_BRUSH);
 	wc.lpszMenuName=NULL;
 	wc.lpszClassName=_T("osubpmreceiver");
 	RegisterClass(&wc);
 	hWnd=CreateWindow(_T("osubpmreceiver"),"osu!bpm",WS_CAPTION|WS_POPUPWINDOW|WS_VISIBLE,100,100,336,98,NULL,NULL,hInstance,NULL);
-	
+	SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)wc.hIcon);
 	HANDLE h1=CreateThread(0,0,(LPTHREAD_START_ROUTINE)Work,0,0,0);CloseHandle(h1);
 	EnableOpenGL(hWnd,&hDC,&hRC);
 	glEnable(GL_BLEND);
@@ -204,7 +206,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 				DispatchMessage(&msg);
 			}
 		} else {
-			const float constFps=(float)(60);
+			const float constFps=(float)(30);
 			DWORD timeInPerFrame=1000.0f/constFps;
 			DWORD timeBegin=GetTickCount();
 			/* OpenGL animation code goes here */
@@ -229,7 +231,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMin)+0.0001)/100)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(speed*BPMMin)+0.0001)/100)%10));
 			glTranslatef(-0.799,-0.313,0.0f); 
 			glScaled(1.0-0.561,1.0-0.561,1.0f);
 			glBegin (GL_QUADS);
@@ -245,7 +247,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMin)+0.0001)/10)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(speed*BPMMin)+0.0001)/10)%10));
 			glTranslatef(-0.658,-0.313,0.0f); 
 			glScaled(1.0-0.561,1.0-0.561,1.0f);
 			glBegin (GL_QUADS);
@@ -261,7 +263,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(BPMMin)+0.0001)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(speed*BPMMin)+0.0001)%10));
 			glTranslatef(-0.519,-0.313,0.0f); 
 			glScaled(1.0-0.561,1.0-0.561,1.0f);
 			glBegin (GL_QUADS);
@@ -277,7 +279,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMax)+0.0001)/100)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(speed*BPMMax)+0.0001)/100)%10));
 			glTranslatef(0.483,-0.313,0.0f); 
 			glScaled(1.0-0.561,1.0-0.561,1.0f);
 			glBegin (GL_QUADS);
@@ -293,7 +295,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPMMax)+0.0001)/10)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(speed*BPMMax)+0.0001)/10)%10));
 			glTranslatef(0.620,-0.313,0.0f); 
 			glScaled(1.0-0.561,1.0-0.561,1.0f);
 			glBegin (GL_QUADS);
@@ -309,7 +311,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(BPMMax)+0.0001)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(speed*BPMMax)+0.0001)%10));
 			glTranslatef(0.762,-0.313,0.0f); 
 			glScaled(1.0-0.561,1.0-0.561,1.0f);
 			glBegin (GL_QUADS);
@@ -325,7 +327,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPM)+0.0001)/100)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(speed*BPM)+0.0001)/100)%10));
 			glTranslatef(-0.257,0.153,0.0f); 
 			glScaled(1.0-0.2334,1.0-0.2334,1.0f);
 			glBegin (GL_QUADS);
@@ -341,7 +343,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(BPM)+0.0001)/10)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber((int(round(speed*BPM)+0.0001)/10)%10));
 			glTranslatef(-0.024,0.153,0.0f); 
 			glScaled(1.0-0.2334,1.0-0.2334,1.0f);
 			glBegin (GL_QUADS);
@@ -357,7 +359,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 			glPopMatrix ();
 			
 			glPushMatrix();
-			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(BPM)+0.0001)%10));
+			glBindTexture(GL_TEXTURE_2D,Drawnumber(int(round(speed*BPM)+0.0001)%10));
 			glTranslatef(0.201,0.153,0.0f); 
 			glScaled(1.0-0.2334,1.0-0.2334,1.0f);
 			glBegin (GL_QUADS);
@@ -417,16 +419,45 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 	DestroyWindow(hWnd);
 	return msg.wParam;
 }
+bool UpPrivilege(){   
+    HANDLE hToken;
+    TOKEN_PRIVILEGES tkp;
+    bool result = OpenProcessToken(GetCurrentProcess(),TOKEN_ADJUST_PRIVILEGES|TOKEN_QUERY,&hToken);   
+    if(!result)return result;   
+    result=LookupPrivilegeValue(NULL,SE_DEBUG_NAME,&tkp.Privileges[0].Luid);   
+    if(!result)return result;   
+    tkp.PrivilegeCount=1; 
+    tkp.Privileges[0].Attributes=SE_PRIVILEGE_ENABLED;   
+    result=AdjustTokenPrivileges(hToken,FALSE,&tkp,sizeof(TOKEN_PRIVILEGES),(PTOKEN_PRIVILEGES)NULL,(PDWORD)NULL);   
+    return result;   
+}
+
 void Work(){
+	UpPrivilege();
 	while(!PID){
 		PID=getPID("osu!.exe");
 		Sleep(50);
 	}
 	Sleep(5000);
 	ShellExecute(0,"open","osu!beatmapfinder.exe",0,0,SW_SHOWNORMAL);
-	if(!(hProcess=OpenProcess(PROCESS_VM_READ,0,PID))){
+	
+	if(!(hProcess=OpenProcess(PROCESS_ALL_ACCESS,0,PID))){
 		printf("Opening Failed\n");
 		quitflag=1;return;
+	}
+	{
+		char ch0[512];
+		strcpy(ch0,_pgmptr);
+		{
+			char* p=ch0;
+			while(strchr(p,'\\')) {
+				p = strchr(p,'\\');
+				p++;
+			}
+			*p = '\0';
+		}
+		strcat(ch0,"osu!speedgetter");
+		DllInject(hProcess,ch0);
 	}
 	LPVOID timeaddraddr=0,timeaddr=0;
 	do{
@@ -467,38 +498,43 @@ LRESULT CALLBACK WndProc (HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) {
 	case WM_COPYDATA: {
 		COPYDATASTRUCT *pCopyData = (COPYDATASTRUCT*)lParam;
 		//printf("%s\n",pCopyData->lpData);
-		loading=1;delayF=1;
-		BPMMin=0;BPM=0;BPMMax=0;
-		Sleep(15);
-		if(!(fp=fopen((char*)pCopyData->lpData,"rt"))){
+		if(pCopyData->dwData==0){
+			loading=1;delayF=1;
+			BPMMin=0;BPM=0;BPMMax=0;
+			Sleep(15);
+			if(!(fp=fopen((char*)pCopyData->lpData,"rt"))){
+				return 0;
+			}
+			list.clear();
+			while(!feof(fp)){
+				if((fgetc(fp)=='[')&&(fgetc(fp)=='T')&&(fgetc(fp)=='i')&&(fgetc(fp)=='m')&&(fgetc(fp)=='i')&&(fgetc(fp)=='n')&&(fgetc(fp)=='g')
+				&&(fgetc(fp)=='P')&&(fgetc(fp)=='o')&&(fgetc(fp)=='i')&&(fgetc(fp)=='n')&&(fgetc(fp)=='t')&&(fgetc(fp)=='s')&&(fgetc(fp)==']')){
+					char tmps[512];
+					long long timeP=0;double beatlen=1000,tbpm=0;
+					fgets(tmps,512,fp);
+					while(1){
+						fgets(tmps,512,fp);
+						if(!strchr(tmps,','))break;
+						sscanf(tmps,"%lld,%lf",&timeP,&beatlen);
+						if(beatlen<=0)continue;
+						tbpm=60000.0/beatlen;
+						if(tbpm>BPMMax||BPMMax==0)BPMMax=tbpm;
+						if(tbpm<BPMMin||BPMMin==0)BPMMin=tbpm;
+						tmplist.x=timeP;
+						tmplist.y=tbpm;
+						list.push_back(tmplist);
+					}
+					break;
+				}
+			}
+			fclose(fp);
+			loading=0;
+			//printf("%.0lf - %.0lf\n",BPMMin,BPMMax);
 			return 0;
 		}
-		list.clear();
-		while(!feof(fp)){
-			if((fgetc(fp)=='[')&&(fgetc(fp)=='T')&&(fgetc(fp)=='i')&&(fgetc(fp)=='m')&&(fgetc(fp)=='i')&&(fgetc(fp)=='n')&&(fgetc(fp)=='g')
-			&&(fgetc(fp)=='P')&&(fgetc(fp)=='o')&&(fgetc(fp)=='i')&&(fgetc(fp)=='n')&&(fgetc(fp)=='t')&&(fgetc(fp)=='s')&&(fgetc(fp)==']')){
-				char tmps[512];
-				long long timeP=0;double beatlen=1000,tbpm=0;
-				fgets(tmps,512,fp);
-				while(1){
-					fgets(tmps,512,fp);
-					if(!strchr(tmps,','))break;
-					sscanf(tmps,"%lld,%lf",&timeP,&beatlen);
-					if(beatlen<=0)continue;
-					tbpm=60000.0/beatlen;
-					if(tbpm>BPMMax||BPMMax==0)BPMMax=tbpm;
-					if(tbpm<BPMMin||BPMMin==0)BPMMin=tbpm;
-					tmplist.x=timeP;
-					tmplist.y=tbpm;
-					list.push_back(tmplist);
-				}
-				break;
-			}
+		if(pCopyData->dwData==1){
+			speed=*(float*)(pCopyData->lpData);
 		}
-		fclose(fp);
-		loading=0;
-		//printf("%.0lf - %.0lf\n",BPMMin,BPMMax);
-		return 0;
 	}
 	default:
 		return DefWindowProc(hWnd,message,wParam,lParam);
@@ -527,4 +563,31 @@ void DisableOpenGL(HWND hWnd,HDC hDC,HGLRC hRC) {
 	wglMakeCurrent(NULL, NULL);
 	wglDeleteContext(hRC);
 	ReleaseDC(hWnd,hDC);
+}
+HMODULE DllInject(HANDLE hProcess,const char *dllname){
+	unsigned long  (__stdcall *faddr)(void*);
+	size_t abc;
+	HMODULE hdll;
+	HANDLE ht;
+	LPVOID paddr;
+	unsigned long exitcode;
+	int dllnamelen;
+	hdll=GetModuleHandleA("kernel32.dll");
+	if(hdll==0) return 0;
+	faddr=(unsigned long (__stdcall *)(void*))GetProcAddress(hdll,"LoadLibraryA");
+	if(faddr==0) return 0;
+	dllnamelen=strlen(dllname)+1;
+	paddr=VirtualAllocEx(hProcess,NULL,dllnamelen,MEM_COMMIT,PAGE_READWRITE);
+	if(paddr==0) return 0;
+	WriteProcessMemory(hProcess,paddr,(void*)dllname,strlen(dllname)+1,(SIZE_T*) &abc);
+	ht=CreateRemoteThread(hProcess,NULL,0,faddr, paddr,0,NULL);
+	if(ht==0){
+		VirtualFreeEx(hProcess,paddr,dllnamelen,MEM_DECOMMIT);
+		return 0;
+	}
+	WaitForSingleObject(ht,INFINITE);
+	GetExitCodeThread(ht,&exitcode);
+	CloseHandle(ht);
+	VirtualFreeEx(hProcess,paddr,dllnamelen,MEM_DECOMMIT);
+	return (HMODULE)exitcode;
 }

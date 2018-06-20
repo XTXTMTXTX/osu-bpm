@@ -1,0 +1,1 @@
+windres bpm.rc -O coff -o bpm.res
