@@ -16,6 +16,16 @@ namespace osu_beatmapfinder
         public string BeatmapChecksum;
         public string BeatmapFileName;
         public string FolderName;
+        public static bool operator ==(BeatmapEntry lhs, BeatmapEntry rhs)
+        {
+            if(lhs.BeatmapChecksum==rhs.BeatmapChecksum&&lhs.BeatmapFileName==rhs.BeatmapFileName&&lhs.FolderName==rhs.FolderName)return true;
+            return false;
+        }
+        public static bool operator !=(BeatmapEntry lhs, BeatmapEntry rhs)
+        {
+            if (lhs.BeatmapChecksum == rhs.BeatmapChecksum && lhs.BeatmapFileName == rhs.BeatmapFileName && lhs.FolderName == rhs.FolderName) return false;
+            return true;
+        }
     }
     public interface ISerializable
     {
@@ -352,6 +362,7 @@ namespace osu_beatmapfinder
                 {
                     hash = data.BeatmapChecksum;
                     var mapTemp = db.Beatmaps.FirstOrDefault(a => a.BeatmapChecksum == hash);
+                    if (mapTemp == default(BeatmapEntry)) continue;
                     var filepath = Path.Combine(osuPath, "Songs", mapTemp.FolderName, mapTemp.BeatmapFileName);
                     //Console.Write("{0}\n", filepath);
                     byte[] arr = Encoding.Default.GetBytes(filepath);
