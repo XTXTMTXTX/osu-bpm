@@ -3,6 +3,6 @@ osu!bpm
 
 osu!beatmapfinder -- c#
 
-osu-bpm -- dec-c++ -- MinGW
+osu-bpm -- dev-c++ -- MinGW
 
-osu!speedgetter -- dec-c++ -- MinGW
+osu!speedgetter -- dev-c++ -- MinGW
