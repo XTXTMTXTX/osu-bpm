@@ -19,7 +19,9 @@ bool quitflag=0,loading=1,delayF=1;
 double BPMMax=0,BPMMin=0,BPM=0,beats=0;
 volatile float speed = 1.00;
 FILE *fp=0;
-unsigned char aob[]= {0xA3,0x00,0x00,0x00,0x00,0x8B,0x35,0x00,0x00,0x00,0x00,0x85,0xF6},mask[]= {1,0,0,0,0,1,1,0,0,0,0,1,1};
+unsigned char aob[]={0x8B,0x76,0x10,0xDB,0x05,0x00,0x00,0x00,0x00,0xD9,0x5D,0xF8,0xD9,0x45,0xF8,0x6A},
+             mask[]={   1,   1,   1,   1,   1,   0,   0,   0,   0,   1,   1,   1,   1,   1,   1,   1};
+int aoboff=5;
 struct info{
 	ll x;
 	double y;
@@ -206,7 +208,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 				DispatchMessage(&msg);
 			}
 		} else {
-			const float constFps=(float)(30);
+			const float constFps=(float)(120);
 			DWORD timeInPerFrame=1000.0f/constFps;
 			DWORD timeBegin=GetTickCount();
 			/* OpenGL animation code goes here */
@@ -461,7 +463,7 @@ void Work(){
 	}
 	LPVOID timeaddraddr=0,timeaddr=0;
 	do{
-		timeaddraddr=LPVOID((unsigned int)(AOB(timeaddraddr))+1);
+		timeaddraddr=LPVOID((unsigned int)(AOB(timeaddraddr))+aoboff);
 		ReadProcessMemory(hProcess,timeaddraddr,&timeaddr,4,NULL);
 	}while(DWORD(timeaddr)<=0x00001000);
 	int time=0;
@@ -470,6 +472,7 @@ void Work(){
 		if(loading){delayF=1;BPMMax=0;BPMMin=0;BPM=0;beats=0;continue;}
 		if(delayF){Sleep(15);delayF=0;time=0;pp=0;}
 		ReadProcessMemory(hProcess,timeaddr,&time,4,NULL);
+		printf("%d\n",time);
 		while((pp+1<list.size())&&(list[pp+1].x<=time))pp++;
 		while((pp-1>=0)&&(list[pp].x>time))pp--;
 		BPM=list[pp].y;
@@ -479,7 +482,7 @@ void Work(){
 		while(beats<0)beats+=60000/min(2000,list[pp].y);
 		beats/=60000/min(2000,list[pp].y);
 		beats=max(0,beats);
-		Sleep(33);
+		Sleep(8);
 	}
 	quitflag=1;
 	CloseHandle(hProcess);
