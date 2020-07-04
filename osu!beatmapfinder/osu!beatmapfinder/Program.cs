@@ -237,9 +237,12 @@ namespace osu_beatmapfinder
                 for (int i = 0; i < length; i++)
                 {
                     int currentIndex = (int)r.BaseStream.Position;
-                    int entryLength = r.ReadInt32();
+                    int entryLength = 0;
+                    const int lengthOsuVersion = 20191107;
+                    if (db.OsuVersion < lengthOsuVersion)
+                        entryLength = r.ReadInt32();
                     db.Beatmaps.Add(ReadFromReader(r, false, db.OsuVersion));
-                    if (r.BaseStream.Position != currentIndex + entryLength + 4)
+                    if (db.OsuVersion < lengthOsuVersion && r.BaseStream.Position != currentIndex + entryLength + 4)
                     {
                         Debug.Fail($"Length doesn't match, {r.BaseStream.Position} instead of expected {currentIndex + entryLength + 4}");
                     }
@@ -354,7 +357,7 @@ namespace osu_beatmapfinder
             string hash = new string('0', 32);
             IntPtr hWnd = (IntPtr)0;
             if (CheckMainExists()) hWnd = (IntPtr)FindWindow("osubpmreceiver",null);
-            //Console.Write("{0}\n", hWnd);
+            Console.Write("{0}\n", hWnd);
             while (CheckOsuExists() && CheckMainExists())
             {
                 var data = ipc.GetBulkClientData();
@@ -364,7 +367,7 @@ namespace osu_beatmapfinder
                     var mapTemp = db.Beatmaps.FirstOrDefault(a => a.BeatmapChecksum == hash);
                     if (mapTemp == default(BeatmapEntry)) continue;
                     var filepath = Path.Combine(osuPath, "Songs", mapTemp.FolderName, mapTemp.BeatmapFileName);
-                    //Console.Write("{0}\n", filepath);
+                    Console.Write("{0}\n", filepath);
                     byte[] arr = Encoding.Default.GetBytes(filepath);
                     int len = arr.Length;
                     COPYDATASTRUCT cdata;
