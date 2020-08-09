@@ -29,7 +29,7 @@ IncludeVersionInfo=0
 SupportXPThemes=0
 CompilerSet=3
 CompilerSettings=0000000100000000001011000
-UnitCount=3
+UnitCount=2
 
 [VersionInfo]
 Major=1
@@ -62,16 +62,6 @@ BuildCmd=
 
 [Unit2]
 FileName=MinHook.h
-CompileCpp=1
-Folder=
-Compile=1
-Link=1
-Priority=1000
-OverrideBuildCmd=0
-BuildCmd=
-
-[Unit3]
-FileName=bass.h
 CompileCpp=1
 Folder=
 Compile=1
