@@ -158,7 +158,17 @@ LRESULT CALLBACK WndProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
 void EnableOpenGL(HWND hWnd,HDC *hDC,HGLRC *hRC);
 void DisableOpenGL(HWND hWnd,HDC hDC,HGLRC hRC);
 void Work();
+double g_offset=0;
 int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,int iCmdShow) {
+	FILE *fp=fopen("offset.ini","r");
+	if(fp==NULL){
+		fp=fopen("offset.ini","w");
+		fprintf(fp,"0\n");
+		fclose(fp);
+	}
+	fscanf(fp,"%lf",&g_offset);
+	fclose(fp);
+	printf("%lf\n",g_offset);
 	WNDCLASS wc;
 	HWND hWnd;
 	HDC hDC;
@@ -440,7 +450,7 @@ void Work(){
 		PID=getPID("osu!.exe");
 		Sleep(50);
 	}
-	Sleep(5000);
+	Sleep(10000);
 	ShellExecute(0,"open","osu!beatmapfinder.exe",0,0,SW_SHOWNORMAL);
 	
 	if(!(hProcess=OpenProcess(PROCESS_ALL_ACCESS,0,PID))){
@@ -471,11 +481,11 @@ void Work(){
 	while(PID==getPID("osu!.exe")&&(getPID("osu!beatmapfinder.exe")!=0)){
 		if(loading){delayF=1;BPMMax=0;BPMMin=0;BPM=0;beats=0;continue;}
 		if(delayF){Sleep(15);delayF=0;time=0;pp=0;Lsystime=GetTickCount();Ltime=0;}
-		if(abs(Ltime-time)>50){
+		if(abs(GetTickCount()-Lsystime)>50){
 			ReadProcessMemory(hProcess,timeaddr,&Ltime,4,NULL);
 			Lsystime=GetTickCount();
 		}
-		time=Ltime+(GetTickCount()-Lsystime);
+		time=Ltime+(GetTickCount()-Lsystime)*speed+g_offset;
 		//printf("%d\n",time);
 		while((pp+1<list.size())&&(list[pp+1].x<=time))pp++;
 		while((pp-1>=0)&&(list[pp].x>time))pp--;
@@ -541,6 +551,7 @@ LRESULT CALLBACK WndProc (HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) {
 		}
 		if(pCopyData->dwData==1){
 			speed=*(float*)(pCopyData->lpData);
+			//printf("%f\n",speed);
 		}
 	}
 	default:
