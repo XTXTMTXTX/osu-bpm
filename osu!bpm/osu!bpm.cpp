@@ -218,9 +218,9 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 				DispatchMessage(&msg);
 			}
 		} else {
-			const float constFps=(float)(500);
-			DWORD timeInPerFrame=1000.0f/constFps;
-			DWORD timeBegin=GetTickCount();
+			const double constFps=(double)(500);
+			double timeInPerFrame=1000.0f/constFps;
+			double timeBegin=CPUclock();
 			/* OpenGL animation code goes here */
 			glClearColor(0.0f,0.0f,0.0f,0.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
@@ -423,8 +423,8 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,i
 
 			SwapBuffers (hDC);
 
-			DWORD timePhase=GetTickCount()-timeBegin;
-			if(timePhase<timeInPerFrame)Sleep(DWORD(timeInPerFrame-timePhase));
+			double timePhase=CPUclock()-timeBegin;
+			if(timePhase<timeInPerFrame)Sleep(int(timeInPerFrame-timePhase));
 		}
 	}
 	DisableOpenGL(hWnd,hDC,hRC);
@@ -450,7 +450,7 @@ void Work(){
 		PID=getPID("osu!.exe");
 		Sleep(50);
 	}
-	Sleep(10000);
+	Sleep(1000);
 	ShellExecute(0,"open","osu!beatmapfinder.exe",0,0,SW_SHOWNORMAL);
 	
 	if(!(hProcess=OpenProcess(PROCESS_ALL_ACCESS,0,PID))){
@@ -476,16 +476,17 @@ void Work(){
 		timeaddraddr=LPVOID((unsigned int)(AOB(timeaddraddr))+aoboff);
 		ReadProcessMemory(hProcess,timeaddraddr,&timeaddr,4,NULL);
 	}while(DWORD(timeaddr)<=0x00001000);
-	int time=0,Ltime=0,Lsystime=GetTickCount();
+	double time=0,Lsystime=CPUclock();
+	int Ltime=0;
 	int pp=0;
 	while(PID==getPID("osu!.exe")&&(getPID("osu!beatmapfinder.exe")!=0)){
 		if(loading){delayF=1;BPMMax=0;BPMMin=0;BPM=0;beats=0;continue;}
-		if(delayF){Sleep(15);delayF=0;time=0;pp=0;Lsystime=GetTickCount();Ltime=0;}
-		if(abs(GetTickCount()-Lsystime)>50){
+		if(delayF){Sleep(15);delayF=0;time=0;pp=0;Lsystime=CPUclock();Ltime=0;}
+		if(abs(CPUclock()-Lsystime)>50){
 			ReadProcessMemory(hProcess,timeaddr,&Ltime,4,NULL);
-			Lsystime=GetTickCount();
+			Lsystime=CPUclock();
 		}
-		time=Ltime+(GetTickCount()-Lsystime)*speed+g_offset;
+		time=Ltime+(CPUclock()-Lsystime)*speed+g_offset;
 		//printf("%d\n",time);
 		while((pp+1<list.size())&&(list[pp+1].x<=time))pp++;
 		while((pp-1>=0)&&(list[pp].x>time))pp--;
