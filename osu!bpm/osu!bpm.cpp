@@ -482,7 +482,7 @@ void Work(){
 	while(PID==getPID("osu!.exe")&&(getPID("osu!beatmapfinder.exe")!=0)){
 		if(loading){delayF=1;BPMMax=0;BPMMin=0;BPM=0;beats=0;continue;}
 		if(delayF){Sleep(15);delayF=0;time=0;pp=0;Lsystime=CPUclock();Ltime=0;}
-		if(abs(CPUclock()-Lsystime)>50){
+		if(abs(CPUclock()-Lsystime)>=160){
 			ReadProcessMemory(hProcess,timeaddr,&Ltime,4,NULL);
 			Lsystime=CPUclock();
 		}
