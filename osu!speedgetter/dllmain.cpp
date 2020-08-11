@@ -65,9 +65,9 @@ BOOL WINAPI MyBASS_ChannelSetAttribute(DWORD handle, DWORD attrib, float value) 
 	    SendMessage(mainhWnd, WM_COPYDATA, 0, (LPARAM)&cdata);
     }
     if(attrib==1){
-    	if(abs(value-44100*1.5)>1e-4&&abs(value-48000*1.5)>1e-4)return pOrigAttr(handle, attrib, value);
-    	counter=CPUclock()+2000;
-		speed=1.5;
+    	if(abs(value-44100*1.5)<1e-4||abs(value-48000*1.5)<1e-4)speed=1.5;
+		else return pOrigAttr(handle, attrib, value);
+    	counter=CPUclock()+500.0;
 		COPYDATASTRUCT cdata;
 		cdata.dwData = 1;
 	    cdata.lpData = (PVOID)&speed;
